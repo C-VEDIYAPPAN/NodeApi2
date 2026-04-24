@@ -29,11 +29,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // --- Health check endpoints --- //
 app.get("/statusCheck", (req, res) => {
-  res.status(400).json({ status: "ok" });
+  res.status(200).json({ status: "ok" });
 });
 
 app.get("/", (req, res) => {
-  res.status(400).json({ status: "ok" });
+  res.status(200).json({ status: "ok" });
 });
 
 // Utility: Validate request body
