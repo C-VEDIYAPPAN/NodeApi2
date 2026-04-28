@@ -103,7 +103,7 @@ function splitJsonReq(json) {
     const jsonCopy = { ...json };
     const MwHeader = Object.keys(jsonCopy)[0];
     MW_HEADER = jsonCopy[MwHeader];
-    
+
     // Delete MwHeader from the copy
     delete jsonCopy[MwHeader];
     
@@ -120,8 +120,9 @@ function splitJsonReq(json) {
 // --- Main API Endpoint --- //
 app.post("/RestApi-call", async (req, res) => {
   log("INFO", "Incoming Request Received");
-  try {
 
+  let soapEndpoint = "Not Initialized";
+  try {
     if (!validateRequestBody(req.body)) {
       log("WARN", "Invalid or empty JSON body");
       return res.status(400).json({ error: "Invalid or empty JSON body" });
@@ -135,7 +136,6 @@ app.post("/RestApi-call", async (req, res) => {
     log("DEBUG", "API Timeout : ", { apitimeout });
 
     // Add switch case for different services
-    let soapEndpoint;
     let xmlRequest;
     let contentType;
     let bankUser;
