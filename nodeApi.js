@@ -259,13 +259,14 @@ app.post("/RestApi-call", async (req, res) => {
     log("DEBUG", "SOAP Endpoint:", { soapEndpoint });
     validateMWHeader(MW_HEADER);
     
-    // Load certificates for mutual TLS
-    const httpsAgent = new https.Agent({
-      cert: fs.readFileSync(process.env.SERVERCERTIFICATE),
-      key: fs.readFileSync(process.env.SERVERPRIVATEKEY),
-      ca: fs.readFileSync(process.env.SERVERCRTCERTIFICATE),
-      rejectUnauthorized: false,
-    });
+const httpsAgent = new https.Agent({
+  pfx: fs.readFileSync("./Certificates/UATCA-MW-Genesys.pfx"),
+  passphrase: "S3cu$3@ajm!2#",   
+  ca: fs.existsSync("./Certificates/AJMBNK-CA2.crt")
+    ? fs.readFileSync("./Certificates/AJMBNK-CA2.crt")
+    : undefined,
+  rejectUnauthorized: true,
+});
 
     // Build request headers with service-specific overrides
     const baseHeaders = {
