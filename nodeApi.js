@@ -6,6 +6,7 @@ import js2xmlparser from "js2xmlparser";
 import dotenv from "dotenv";
 import fs from "fs";
 import https from "https";
+import path from "path";
 
 dotenv.config({ path: "./Config.env" });
 const app = express();
@@ -258,16 +259,46 @@ app.post("/RestApi-call", async (req, res) => {
     }
     log("DEBUG", "SOAP Endpoint:", { soapEndpoint });
     validateMWHeader(MW_HEADER);
-    
-const httpsAgent = new https.Agent({
-  pfx: fs.readFileSync("./Certificates/UATCA-MW-Genesys.pfx"),
-  passphrase: "S3cu$3@ajm!2#",   
-  ca: fs.existsSync("./Certificates/AJMBNK-CA2.crt")
-    ? fs.readFileSync("./Certificates/AJMBNK-CA2.crt")
-    : undefined,
-  rejectUnauthorized: true,
-});
 
+let httpsAgent;
+
+try {
+  const pfxPath = path.resolve("./Certificates/UATCA-MW-Genesys.pfx");
+  const caPath = path.resolve("./Certificates/AJMBNK-CA2.crt");
+
+  log("INFO", "Checking certificate files", {
+    pfxExists: fs.existsSync(pfxPath),
+    caExists: fs.existsSync(caPath),
+    pfxPath,
+    caPath,
+  });
+
+  const pfxBuffer = fs.readFileSync(pfxPath);
+  const caBuffer = fs.existsSync(caPath)
+    ? fs.readFileSync(caPath)
+    : undefined;
+
+  log("INFO", "Certificate files loaded", {
+    pfxSize: pfxBuffer.length,
+    caSize: caBuffer ? caBuffer.length : "Not Provided",
+  });
+
+  // ✅ assign to outer variable
+  httpsAgent = new https.Agent({
+    pfx: pfxBuffer,
+    passphrase: process.env.PFX_PASSWORD || "S3cu$3@ajm!2#",
+    ca: caBuffer,
+    rejectUnauthorized: true,
+  });
+
+  log("INFO", "HTTPS Agent created successfully");
+
+} catch (err) {
+  log("ERROR", "Failed to load certificates", {
+    error: err.message,
+  });
+  throw err;
+}
     // Build request headers with service-specific overrides
     const baseHeaders = {
       "Content-Type": contentType,
@@ -390,40 +421,54 @@ const httpsAgent = new https.Agent({
     log("INFO", "Successfully processed API request");
     res.status(200).json(AfterHeaderAdd);
   } catch (err) {
-    log("ERROR", "Exception caught", { error: err.message, stack: err.stack });
+  log("ERROR", "Exception caught", { error: err.message });
 
-    // Detect certificate errors and print details
-    if (
-      err.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
-      err.code === "SELF_SIGNED_CERT_IN_CHAIN" ||
-      (err.message &&
-        (err.message.includes("self-signed certificate") ||
-          err.message.includes("unable to verify the first certificate") ||
-          err.message.includes("certificate")))
-    ) {
-      log("ERROR", "Certificate validation failed", { error: err.message });
-      return res.status(502).json({
-        error: "Certificate validation failed",
-        message: err.message,
-      });
-    }
+  // ✅ Handle DNS / host not found
+  if (err.code === "ENOTFOUND") {
+    log("ERROR", "DNS resolution failed", {
+      host: soapEndpoint,
+    });
 
-    if (axios.isAxiosError(err)) {
-      log("ERROR", "Axios Error Response", {
-        error: err.response?.data || err.message,
-        details: err,
-      });
-      return res.status(502).json({
-        error: "API service call failed",
-        message: err.response?.data || err.message,
-      });
-    }
+    return res.status(502).json({
+      error: "Host not reachable",
+      message:
+        "Unable to resolve API host. Please check network/VPN/whitelisting.",
+    });
+  }
 
-    res.status(500).json({
-      error: "Internal Server Error",
+  // ✅ Handle timeout
+  if (err.code === "ECONNABORTED") {
+    return res.status(504).json({
+      error: "API timeout",
+      message: "The API is taking too long to respond",
+    });
+  }
+
+  // ✅ Handle SSL issues
+  if (
+    err.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
+    err.code === "SELF_SIGNED_CERT_IN_CHAIN"
+  ) {
+    return res.status(502).json({
+      error: "SSL certificate validation failed",
       message: err.message,
     });
   }
+
+  // ✅ Axios error (response from server)
+  if (axios.isAxiosError(err)) {
+    return res.status(502).json({
+      error: "API service call failed",
+      message: err.response?.data || err.message,
+    });
+  }
+
+  // ✅ Default fallback
+  return res.status(500).json({
+    error: "Internal Server Error",
+    message: err.message,
+  });
+}
 });
 
 // Start HTTP server
