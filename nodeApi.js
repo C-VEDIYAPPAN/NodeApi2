@@ -289,6 +289,7 @@ try {
     passphrase: process.env.PFX_PASSWORD || "S3cu$3@ajm1G1",
     ca: caBuffer,
     rejectUnauthorized: true,
+    keepAlive: false,
   });
 
   log("INFO", "HTTPS Agent created successfully");
