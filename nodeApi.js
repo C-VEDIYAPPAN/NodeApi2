@@ -263,7 +263,7 @@ app.post("/RestApi-call", async (req, res) => {
 let httpsAgent;
 
 try {
-  const pfxPath = path.resolve("./Certificates/UATCA-MW-Genesys.pfx");
+  const pfxPath = path.resolve("./Certificates/PRDCA-MW-Genesys.pfx");
   const caPath = path.resolve("./Certificates/AJMBNK-CA2.crt");
 
   log("INFO", "Checking certificate files", {
@@ -286,7 +286,7 @@ try {
   // ✅ assign to outer variable
   httpsAgent = new https.Agent({
     pfx: pfxBuffer,
-    passphrase: process.env.PFX_PASSWORD || "S3cu$3@ajm!2#",
+    passphrase: process.env.PFX_PASSWORD || "S3cu$3@ajm1G1",
     ca: caBuffer,
     rejectUnauthorized: true,
   });
