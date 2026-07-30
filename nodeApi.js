@@ -301,7 +301,7 @@ try {
   // ✅ assign to outer variable
   httpsAgent = new https.Agent({
     pfx: pfxBuffer,
-    passphrase: process.env.PFX_PASSWORD || "S3cu$3@ajm1G1",
+    passphrase: process.env.PFX_PASSWORD || "S3cu$3@ajm!2#",
     ca: caBuffer,
     rejectUnauthorized: true,
     keepAlive: false,
