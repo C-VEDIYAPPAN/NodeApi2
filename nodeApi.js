@@ -96,6 +96,21 @@ function convertXmlToJson(xml) {
   });
 }
 
+// Utility: Force CUSTOMER_LIST to always be an array, even when only 1 record is returned
+function normalizeCustomerList(jsonResult) {
+  try {
+    const customerList = jsonResult?.EE_EAI_MESSAGE?.Response?.CUSTOMER_LIST;
+    if (customerList && !Array.isArray(customerList)) {
+      jsonResult.EE_EAI_MESSAGE.Response.CUSTOMER_LIST = [customerList];
+      log("DEBUG", "Normalized single CUSTOMER_LIST object into array");
+    }
+    return jsonResult;
+  } catch (err) {
+    log("ERROR", "normalizeCustomerList failed", { error: err.message });
+    return jsonResult;
+  }
+}
+
 // Utility: Split MW And Ajman JSON req
 function splitJsonReq(json) {
   try {
@@ -263,7 +278,7 @@ app.post("/RestApi-call", async (req, res) => {
 let httpsAgent;
 
 try {
-  const pfxPath = path.resolve("./Certificates/PRDCA-MW-Genesys.pfx");
+  const pfxPath = path.resolve("./Certificates/UATCA-MW-Genesys.pfx");
   const caPath = path.resolve("./Certificates/AJMBNK-CA2.crt");
 
   log("INFO", "Checking certificate files", {
@@ -411,6 +426,9 @@ try {
             break;
         default:
            jsonResult = await convertXmlToJson(response.data);
+           if (ServiceName === 'EAI_EXT_CUSTOMER_SEARCH') {
+             jsonResult = normalizeCustomerList(jsonResult);
+           }
           break;
     }
    
