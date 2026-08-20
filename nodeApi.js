@@ -121,10 +121,10 @@ function splitJsonReq(json) {
 
     // Delete MwHeader from the copy
     delete jsonCopy[MwHeader];
-    
+
     log("DEBUG", "Extracted MW_HEADER", { MW_HEADER });
     log("DEBUG", "Remaining JSON request", { jsonCopy });
-    
+
     return jsonCopy;
   } catch (err) {
     log("ERROR", "Split MW And Ajman JSON req failed", { error: err.message });
@@ -142,11 +142,19 @@ app.post("/RestApi-call", async (req, res) => {
       log("WARN", "Invalid or empty JSON body");
       return res.status(400).json({ error: "Invalid or empty JSON body" });
     }
-    
+
     const jsonReqBody = req.body;
     const header = Object.keys(jsonReqBody)[0];
     const { ServiceName } = jsonReqBody[header];
     log("DEBUG", "Service Name:", { ServiceName });
+
+    // --- Allow-list check: only process services explicitly enabled in Config.env --- //
+    const isServiceEnabled = process.env[ServiceName] === "Y";
+    if (!isServiceEnabled) {
+      log("WARN", "ServiceName not enabled, request rejected", { ServiceName });
+      return res.status(403).json({ error: "Service not permitted", ServiceName });
+    }
+
     const apitimeout = process.env[`${ServiceName}_TIMEOUT`] || process.env.COMMON_TIMEOUT;
     log("DEBUG", "API Timeout : ", { apitimeout });
 
@@ -161,7 +169,7 @@ app.post("/RestApi-call", async (req, res) => {
             xmlRequest = splitJsonReq(req.body);
             contentType = "application/json";
             break;
-        
+
         case 'LDSimulationInquiry':
             soapEndpoint = process.env.LD_APIURL;
             xmlRequest = splitJsonReq(req.body);
@@ -246,7 +254,7 @@ app.post("/RestApi-call", async (req, res) => {
             break;
         case 'VerifyPayment':
             soapEndpoint = process.env.VERIFY_PAYMENT_APIURL;
-            bankUser = jsonReqBody[header]?.BankUser; 
+            bankUser = jsonReqBody[header]?.BankUser;
             log("DEBUG", "S_BANKUSER :", bankUser);
             if (soapEndpoint && soapEndpoint.includes("S_BANKUSER")) {
             soapEndpoint = soapEndpoint.replace("S_BANKUSER", bankUser);
@@ -257,7 +265,7 @@ app.post("/RestApi-call", async (req, res) => {
             break;
         case 'ConfirmPayment':
             soapEndpoint = process.env.CONFIRM_PAYMENT_APIURL;
-            bankUser = jsonReqBody[header]?.BankUser; 
+            bankUser = jsonReqBody[header]?.BankUser;
             log("DEBUG", "S_BANKUSER :", bankUser);
             if (soapEndpoint && soapEndpoint.includes("S_BANKUSER")) {
             soapEndpoint = soapEndpoint.replace("S_BANKUSER", bankUser);
@@ -298,7 +306,7 @@ try {
     caSize: caBuffer ? caBuffer.length : "Not Provided",
   });
 
-  // ✅ assign to outer variable
+  // assign to outer variable
   httpsAgent = new https.Agent({
     pfx: pfxBuffer,
     passphrase: process.env.PFX_PASSWORD || "S3cu$3@ajm!2#",
@@ -349,10 +357,10 @@ try {
         delete headers[k];
       }
     });
-    
+
     log("DEBUG", "Final Request Headers", { headers });
 
-    // Make the API request 
+    // Make the API request
     const response = await axios.post(soapEndpoint, xmlRequest, {
       headers,
       httpsAgent,
@@ -431,7 +439,7 @@ try {
            }
           break;
     }
-   
+
     const AfterHeaderAdd = {
       MW_HEADER,
       ...jsonResult,
@@ -442,7 +450,7 @@ try {
   } catch (err) {
   log("ERROR", "Exception caught", { error: err.message });
 
-  // ✅ Handle DNS / host not found
+  // Handle DNS / host not found
   if (err.code === "ENOTFOUND") {
     log("ERROR", "DNS resolution failed", {
       host: soapEndpoint,
@@ -455,7 +463,7 @@ try {
     });
   }
 
-  // ✅ Handle timeout
+  // Handle timeout
   if (err.code === "ECONNABORTED") {
     return res.status(504).json({
       error: "API timeout",
@@ -463,7 +471,7 @@ try {
     });
   }
 
-  // ✅ Handle SSL issues
+  // Handle SSL issues
   if (
     err.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
     err.code === "SELF_SIGNED_CERT_IN_CHAIN"
@@ -474,7 +482,7 @@ try {
     });
   }
 
-  // ✅ Axios error (response from server)
+  // Axios error (response from server)
   if (axios.isAxiosError(err)) {
     return res.status(502).json({
       error: "API service call failed",
@@ -482,7 +490,7 @@ try {
     });
   }
 
-  // ✅ Default fallback
+  // Default fallback
   return res.status(500).json({
     error: "Internal Server Error",
     message: err.message,
