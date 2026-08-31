@@ -169,7 +169,6 @@ app.post("/RestApi-call", async (req, res) => {
     let contentType;
     let bankUser;
     let mobileNum;
-    let httpMethod = "POST"; // default; overridden per-service below when the backend expects GET
     switch (ServiceName) {
         case 'SMS_OTP':
             soapEndpoint = process.env.SEND_OTP_APIURL;
@@ -182,22 +181,11 @@ app.post("/RestApi-call", async (req, res) => {
             xmlRequest = splitJsonReq(req.body);
             contentType = "application/json";
             break;
-        case 'GetGrantID': {
-            // Downstream gateway returned BIP6311E for POST — this operation expects GET
-            // with customerId/grantType passed as query parameters, not a JSON body.
-            const splitResult = splitJsonReq(req.body); // extracts MW_HEADER (sets global) for later response assembly
-            const rootKey = Object.keys(splitResult)[0]; // e.g. "EE_EAI_MESSAGE"
-            const reqDetails = splitResult[rootKey]?.ReqDetails || {};
-            const grantQueryParams = new URLSearchParams({
-              customerId: reqDetails.customerId || "",
-              grantType: reqDetails.grantType || "",
-            }).toString();
-            soapEndpoint = `${process.env.GET_GRANT_ID_APIURL}?${grantQueryParams}`;
-            log("DEBUG", "GetGrantID query built", { soapEndpoint });
+        case 'GetGrantID':
+            soapEndpoint = process.env.GET_GRANT_ID_APIURL;
+            xmlRequest = splitJsonReq(req.body);
             contentType = "application/json";
-            httpMethod = "GET";
             break;
-        }
         case 'GetLimits_Retail':
             soapEndpoint = process.env.GET_LIMITS_APIURL;
             xmlRequest = splitJsonReq(req.body);
@@ -384,17 +372,11 @@ try {
     log("DEBUG", "Final Request Headers", { headers });
 
     // Make the API request
-    const response = httpMethod === "GET"
-      ? await axios.get(soapEndpoint, {
-          headers,
-          httpsAgent,
-          timeout: apitimeout,
-        })
-      : await axios.post(soapEndpoint, xmlRequest, {
-          headers,
-          httpsAgent,
-          timeout: apitimeout,
-        });
+    const response = await axios.post(soapEndpoint, xmlRequest, {
+      headers,
+      httpsAgent,
+      timeout: apitimeout,
+    });
 
     log("INFO", "Certificate validation successful");
 
