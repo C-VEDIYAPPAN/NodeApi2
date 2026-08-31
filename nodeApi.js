@@ -149,10 +149,16 @@ app.post("/RestApi-call", async (req, res) => {
     log("DEBUG", "Service Name:", { ServiceName });
 
     // --- Allow-list check: only process services explicitly enabled in Config.env --- //
-    const isServiceEnabled = process.env[ServiceName] === "Y";
-    if (!isServiceEnabled) {
-      log("WARN", "ServiceName not enabled, request rejected", { ServiceName });
-      return res.status(403).json({ error: "Service not permitted", ServiceName });
+    // If ALLOWALL=Y is set, skip the per-service restriction entirely and allow every ServiceName.
+    const allowAll = process.env.ALLOWALL === "Y";
+    if (!allowAll) {
+      const isServiceEnabled = process.env[ServiceName] === "Y";
+      if (!isServiceEnabled) {
+        log("WARN", "ServiceName not enabled, request rejected", { ServiceName });
+        return res.status(403).json({ error: "Service not permitted", ServiceName });
+      }
+    } else {
+      log("DEBUG", "ALLOWALL is enabled, skipping service allow-list check", { ServiceName });
     }
 
     const apitimeout = process.env[`${ServiceName}_TIMEOUT`] || process.env.COMMON_TIMEOUT;
@@ -172,6 +178,11 @@ app.post("/RestApi-call", async (req, res) => {
 
         case 'LDSimulationInquiry':
             soapEndpoint = process.env.LD_APIURL;
+            xmlRequest = splitJsonReq(req.body);
+            contentType = "application/json";
+            break;
+        case 'GetGrantID':
+            soapEndpoint = process.env.GET_GRANT_ID_APIURL;
             xmlRequest = splitJsonReq(req.body);
             contentType = "application/json";
             break;
@@ -385,6 +396,9 @@ try {
             jsonResult = response.data;
             break;
         case 'LDSimulationInquiry':
+            jsonResult = response.data;
+            break;
+        case 'GetGrantID':
             jsonResult = response.data;
             break;
         case 'GetLimits_Retail':
